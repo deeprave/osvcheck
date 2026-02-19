@@ -1,11 +1,39 @@
 """Package scanning logic."""
 
+import logging
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Protocol, Tuple
+from typing import Any, Dict, List, Optional, Protocol, Tuple
 
 from .cache import get_cached_result, update_cache
 from .dependencies import is_direct_dependency
 from .package_detection import get_packages_via_pip, get_packages_via_uv, parse_uv_lock
+
+logger = logging.getLogger("osvcheck")
+
+
+class ScanStatistics:
+    """Track scanning statistics."""
+
+    def __init__(self):
+        self.cache_hits = 0
+        self.cache_misses = 0
+        self.api_queries = 0
+        self.packages_scanned = 0
+        self.next_expiry: Optional[float] = None
+
+    def update_next_expiry(self, expires_at: float):
+        """Update next expiry time."""
+        if self.next_expiry is None or expires_at < self.next_expiry:
+            self.next_expiry = expires_at
+
+    def get_next_expiry_str(self) -> Optional[str]:
+        """Get formatted next expiry time."""
+        if self.next_expiry:
+            return datetime.fromtimestamp(self.next_expiry).strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+        return None
 
 
 class PackageLister(Protocol):
@@ -49,6 +77,7 @@ class PackageScanner:
     def __init__(self, osv_client: Any, package_lister: PackageLister):
         self.osv_client = osv_client
         self.package_lister = package_lister
+        self.stats = ScanStatistics()
 
     def scan_packages(
         self, direct_deps: List[str], cache: Dict[str, Dict[str, Any]]
@@ -62,18 +91,37 @@ class PackageScanner:
         direct_vulnerable = []
         indirect_vulnerable = []
 
+        # Calculate next expiry from cache
+        for entry in cache.values():
+            if "expires_at" in entry:
+                self.stats.update_next_expiry(entry["expires_at"])
+
         for pkg in all_packages:
             pkg_name = pkg["name"]
             pkg_version = pkg["version"]
             is_direct = is_direct_dependency(pkg_name, direct_deps)
 
+            self.stats.packages_scanned += 1
+            logger.debug("Scanning package: %s %s", pkg_name, pkg_version)
+            logger.debug("  Is direct dependency: %s", is_direct)
+
             # Check cache first
             cached = get_cached_result(cache, pkg_name, pkg_version)
             if cached:
+                self.stats.cache_hits += 1
+                logger.debug(
+                    "  Cache hit for %s:%s (type: %s)", pkg_name, pkg_version, cached
+                )
                 has_vuln = cached in ("direct", "indirect")
             else:
+                self.stats.cache_misses += 1
+                logger.debug(
+                    "  Cache miss for %s:%s - querying OSV API", pkg_name, pkg_version
+                )
                 # Query API
+                self.stats.api_queries += 1
                 has_vuln = self.osv_client.check_vulnerability(pkg_name, pkg_version)
+                logger.debug("  API returned vulnerability: %s", has_vuln)
                 vuln_type = (
                     ("direct" if is_direct else "indirect") if has_vuln else None
                 )
