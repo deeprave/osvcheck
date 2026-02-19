@@ -28,6 +28,7 @@ env/
 
 # Testing
 .pytest_cache/
+.osvcheck_cache
 .coverage
 .coverage.*
 htmlcov/
@@ -48,3 +49,8 @@ Thumbs.db
 # uv
 .uv/
 uv.lock
+
+# AI
+.guide.yaml
+.kiro/
+.claude/

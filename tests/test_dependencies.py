@@ -26,7 +26,7 @@ dependencies = [
     "flask[extra]",
 ]
 """)
-    
+
     deps = get_direct_dependencies(pyproject)
     assert deps == ["requests", "django", "flask"]
 
@@ -37,7 +37,7 @@ def test_get_direct_dependencies_no_deps(tmp_path):
 [project]
 name = "test"
 """)
-    
+
     deps = get_direct_dependencies(pyproject)
     assert deps == []
 
@@ -50,7 +50,7 @@ def test_get_direct_dependencies_missing_file(tmp_path):
 
 def test_is_direct_dependency():
     direct_deps = ["requests", "django", "flask"]
-    
+
     assert is_direct_dependency("requests", direct_deps)
     assert is_direct_dependency("Django", direct_deps)
     assert not is_direct_dependency("pytest", direct_deps)

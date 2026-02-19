@@ -1,11 +1,11 @@
 """Package scanning logic."""
 
-import json
-import subprocess
+from pathlib import Path
 from typing import Any, Dict, List, Protocol, Tuple
 
 from .cache import get_cached_result, update_cache
 from .dependencies import is_direct_dependency
+from .package_detection import get_packages_via_pip, get_packages_via_uv, parse_uv_lock
 
 
 class PackageLister(Protocol):
@@ -16,21 +16,31 @@ class PackageLister(Protocol):
         ...
 
 
+class UvLockPackageLister:
+    """Package lister using uv.lock file."""
+
+    def __init__(self, uv_lock_path: Path):
+        self.uv_lock_path = uv_lock_path
+
+    def list_packages(self) -> List[Dict[str, str]]:
+        """Get packages from uv.lock."""
+        return parse_uv_lock(self.uv_lock_path)
+
+
 class UvPackageLister:
     """Package lister using uv pip list."""
 
     def list_packages(self) -> List[Dict[str, str]]:
         """Get all installed packages using uv."""
-        try:
-            result = subprocess.run(
-                ["uv", "pip", "list", "--format", "json"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            return json.loads(result.stdout)
-        except Exception:
-            return []
+        return get_packages_via_uv()
+
+
+class PipPackageLister:
+    """Package lister using pip list."""
+
+    def list_packages(self) -> List[Dict[str, str]]:
+        """Get all installed packages using pip."""
+        return get_packages_via_pip()
 
 
 class PackageScanner:
