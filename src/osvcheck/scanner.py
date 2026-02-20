@@ -15,14 +15,14 @@ logger = logging.getLogger("osvcheck")
 class ScanStatistics:
     """Track scanning statistics."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.cache_hits = 0
         self.cache_misses = 0
         self.api_queries = 0
         self.packages_scanned = 0
         self.next_expiry: Optional[float] = None
 
-    def update_next_expiry(self, expires_at: float):
+    def update_next_expiry(self, expires_at: float) -> None:
         """Update next expiry time."""
         if self.next_expiry is None or expires_at < self.next_expiry:
             self.next_expiry = expires_at
