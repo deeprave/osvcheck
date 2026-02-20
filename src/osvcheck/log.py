@@ -76,6 +76,7 @@ def setup_logging(
         use_color = sys.stderr.isatty()
 
     # Console handler
+    console_handler: logging.Handler
     if use_json:
         console_handler = logging.StreamHandler(sys.stderr)
         console_handler.setFormatter(JSONFormatter())
