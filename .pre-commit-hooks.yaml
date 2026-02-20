@@ -1,0 +1,7 @@
+- id: osvcheck
+  name: osvcheck
+  description: Check Python dependencies for security vulnerabilities using OSV database
+  entry: osvcheck
+  language: python
+  pass_filenames: false
+  types: [python]
