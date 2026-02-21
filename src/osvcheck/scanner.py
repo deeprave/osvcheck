@@ -88,49 +88,75 @@ class PackageScanner:
             Tuple of (direct_vulnerable, indirect_vulnerable) package names.
         """
         all_packages = self.package_lister.list_packages()
-        direct_vulnerable = []
-        indirect_vulnerable = []
+        direct_vulnerable: List[str] = []
+        indirect_vulnerable: List[str] = []
 
         # Calculate next expiry from cache
         for entry in cache.values():
             if "expires_at" in entry:
                 self.stats.update_next_expiry(entry["expires_at"])
 
+        # Separate cached and uncached packages
+        uncached_packages = []
         for pkg in all_packages:
             pkg_name = pkg["name"]
             pkg_version = pkg["version"]
             is_direct = is_direct_dependency(pkg_name, direct_deps)
 
             self.stats.packages_scanned += 1
-            logger.debug("Scanning package: %s %s", pkg_name, pkg_version)
-            logger.debug("  Is direct dependency: %s", is_direct)
 
-            # Check cache first
             cached = get_cached_result(cache, pkg_name, pkg_version)
             if cached:
                 self.stats.cache_hits += 1
-                logger.debug(
-                    "  Cache hit for %s:%s (type: %s)", pkg_name, pkg_version, cached
-                )
-                has_vuln = cached in ("direct", "indirect")
+                dep_type = "direct" if is_direct else "indirect"
+                logger.debug("  %s:%s cache hit (%s)", pkg_name, pkg_version, dep_type)
+                if cached in ("direct", "indirect"):
+                    (direct_vulnerable if is_direct else indirect_vulnerable).append(
+                        pkg_name
+                    )
             else:
                 self.stats.cache_misses += 1
-                logger.debug(
-                    "  Cache miss for %s:%s - querying OSV API", pkg_name, pkg_version
-                )
-                # Query API
-                self.stats.api_queries += 1
-                has_vuln = self.osv_client.check_vulnerability(pkg_name, pkg_version)
-                logger.debug("  API returned vulnerability: %s", has_vuln)
-                vuln_type = (
-                    ("direct" if is_direct else "indirect") if has_vuln else None
-                )
-                update_cache(cache, pkg_name, pkg_version, vuln_type)
+                dep_type = "direct" if is_direct else "indirect"
+                logger.debug("  %s:%s cache miss (%s)", pkg_name, pkg_version, dep_type)
+                uncached_packages.append((pkg_name, pkg_version, is_direct))
 
-            if has_vuln:
-                if is_direct:
-                    direct_vulnerable.append(pkg_name)
-                else:
-                    indirect_vulnerable.append(pkg_name)
+        # Batch query uncached packages
+        logger.info(
+            "Cache scan: %d packages processed, %d hits (skipped), %d misses",
+            len(all_packages),
+            self.stats.cache_hits,
+            self.stats.cache_misses,
+        )
+
+        if uncached_packages:
+            batch_size = 256
+            for i in range(0, len(uncached_packages), batch_size):
+                batch = uncached_packages[i : i + batch_size]
+                pkg_tuples = [(name, ver) for name, ver, _ in batch]
+
+                logger.debug(
+                    "  Batch querying %d packages (batch %d/%d)",
+                    len(pkg_tuples),
+                    i // batch_size + 1,
+                    (len(uncached_packages) + batch_size - 1) // batch_size,
+                )
+
+                self.stats.api_queries += 1
+                results = self.osv_client.check_vulnerabilities_batch(pkg_tuples)
+
+                for (pkg_name, pkg_version, is_direct), has_vuln in zip(
+                    batch, [results.get((n, v), False) for n, v in pkg_tuples]
+                ):
+                    vuln_status = "vulnerability" if has_vuln else "no vulnerability"
+                    logger.debug("  %s:%s %s", pkg_name, pkg_version, vuln_status)
+                    vuln_type = (
+                        ("direct" if is_direct else "indirect") if has_vuln else None
+                    )
+                    update_cache(cache, pkg_name, pkg_version, vuln_type)
+
+                    if has_vuln:
+                        (
+                            direct_vulnerable if is_direct else indirect_vulnerable
+                        ).append(pkg_name)
 
         return direct_vulnerable, indirect_vulnerable

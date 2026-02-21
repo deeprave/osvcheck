@@ -173,15 +173,14 @@ def main() -> None:
     direct_vulnerable, indirect_vulnerable = scanner.scan_packages(direct_deps, cache)
 
     # Log statistics
-    logger.debug("")
-    logger.debug("Cache statistics:")
-    logger.debug("  - Total entries: %d", len(cache))
-    logger.debug("  - Cache hits: %d", scanner.stats.cache_hits)
-    logger.debug("  - Cache misses: %d", scanner.stats.cache_misses)
-    logger.debug("  - API queries: %d", scanner.stats.api_queries)
+    logger.info(
+        "Queries: %d, %d packages",
+        scanner.stats.api_queries,
+        scanner.stats.cache_misses,
+    )
     next_expiry = scanner.stats.get_next_expiry_str()
-    if next_expiry:
-        logger.debug("  - Next expiry: %s", next_expiry)
+    expiry_str = f", next expiry: {next_expiry}" if next_expiry else ""
+    logger.debug("Cache entries: %d%s", len(cache), expiry_str)
 
     # Save cache and report
     save_cache(cache, CACHE_FILE)
