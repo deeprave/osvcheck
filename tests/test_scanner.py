@@ -77,6 +77,29 @@ def test_scanner_uses_cache():
 
     assert direct == ["cached-pkg"]
     assert indirect == []
+    assert scanner.stats.cache_hits == 1
+    assert scanner.stats.cache_misses == 0
+    assert scanner.stats.api_queries == 0
+
+
+def test_scanner_cache_hit_clean_package():
+    osv_client = FakeOSVClient(set())
+    package_lister = FakePackageLister(
+        [
+            {"name": "clean-pkg", "version": "1.0"},
+        ]
+    )
+
+    cache = {"clean-pkg:1.0": {"dep_type": None, "expires_at": 9999999999}}
+
+    scanner = PackageScanner(osv_client, package_lister)
+    direct, indirect = scanner.scan_packages(["clean-pkg"], cache)
+
+    assert direct == []
+    assert indirect == []
+    assert scanner.stats.cache_hits == 1
+    assert scanner.stats.cache_misses == 0
+    assert scanner.stats.api_queries == 0
 
 
 def test_scanner_no_vulnerabilities():

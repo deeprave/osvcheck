@@ -49,7 +49,7 @@ osvcheck --no-color      # Disable color output
 Add to `.pre-commit-config.yaml`:
 ```yaml
 - repo: https://github.com/deeprave/osvcheck
-  rev: v1.0.0b1
+  rev: v1.0.1
   hooks:
     - id: osvcheck
 ```
