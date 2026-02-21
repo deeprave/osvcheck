@@ -62,12 +62,10 @@ jobs:
     
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        password: ${{ secrets.PYPI_TOKEN }}
     
     - name: Get version
       id: version
-      run: echo "version=$(uv run python -c 'import tomllib; print(tomllib.load(open(\"pyproject.toml\", \"rb\"))[\"project\"][\"version\"])')" >> $GITHUB_OUTPUT
+      run: echo "version=$(tomlq -r '.project.version' pyproject.toml)" >> $GITHUB_OUTPUT
     
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
