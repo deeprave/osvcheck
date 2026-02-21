@@ -70,7 +70,7 @@ def test_scanner_uses_cache():
         ]
     )
 
-    cache = {"cached-pkg:1.0": {"vuln_type": "direct", "expires_at": 9999999999}}
+    cache = {"cached-pkg:1.0": {"dep_type": "direct", "expires_at": 9999999999}}
 
     scanner = PackageScanner(osv_client, package_lister)
     direct, indirect = scanner.scan_packages(["cached-pkg"], cache)

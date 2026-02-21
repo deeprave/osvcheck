@@ -46,9 +46,9 @@ def test_load_cache_removes_expired_entries(tmp_path):
     current = time.time()
 
     cache_file.write_text(
-        '{"valid:1.0": {"vuln_type": "direct", "expires_at": '
+        '{"valid:1.0": {"dep_type": "direct", "expires_at": '
         + str(current + 1000)
-        + '}, "expired:1.0": {"vuln_type": "indirect", "expires_at": '
+        + '}, "expired:1.0": {"dep_type": "indirect", "expires_at": '
         + str(current - 1)
         + "}}"
     )
@@ -60,20 +60,20 @@ def test_load_cache_removes_expired_entries(tmp_path):
 
 def test_save_and_load_cache(tmp_path):
     cache_file = tmp_path / "cache.json"
-    cache = {"pkg:1.0": {"vuln_type": "direct", "expires_at": time.time() + 1000}}
+    cache = {"pkg:1.0": {"dep_type": "direct", "expires_at": time.time() + 1000}}
 
     save_cache(cache, cache_file)
     loaded = load_cache(cache_file)
 
     assert "pkg:1.0" in loaded
-    assert loaded["pkg:1.0"]["vuln_type"] == "direct"
+    assert loaded["pkg:1.0"]["dep_type"] == "direct"
 
 
 def test_get_cached_result():
-    cache = {"pkg:1.0": {"vuln_type": "direct", "expires_at": time.time() + 1000}}
+    cache = {"pkg:1.0": {"dep_type": "direct", "expires_at": time.time() + 1000}}
 
-    assert get_cached_result(cache, "pkg", "1.0") == "direct"
-    assert get_cached_result(cache, "missing", "1.0") is None
+    assert get_cached_result(cache, "pkg", "1.0") == (True, "direct")
+    assert get_cached_result(cache, "missing", "1.0") == (False, None)
 
 
 def test_update_cache():
@@ -81,5 +81,5 @@ def test_update_cache():
     update_cache(cache, "pkg", "1.0", "indirect")
 
     assert "pkg:1.0" in cache
-    assert cache["pkg:1.0"]["vuln_type"] == "indirect"
+    assert cache["pkg:1.0"]["dep_type"] == "indirect"
     assert cache["pkg:1.0"]["expires_at"] > time.time()

@@ -4,7 +4,7 @@ import json
 import random
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 CACHE_MIN_TTL = 12 * 3600  # 12 hours in seconds
 CACHE_MAX_TTL = 48 * 3600  # 48 hours in seconds
@@ -52,20 +52,26 @@ def save_cache(cache: Dict[str, Dict[str, Any]], cache_file: Path) -> None:
 
 def get_cached_result(
     cache: Dict[str, Dict[str, Any]], pkg_name: str, pkg_version: str
-) -> Optional[str]:
-    """Get cached vulnerability result for a package."""
+) -> Tuple[bool, Optional[str]]:
+    """Get cached vulnerability result for a package.
+
+    Returns:
+        Tuple of (found, dep_type) where found indicates if entry exists in cache.
+    """
     cache_key = get_cache_key(pkg_name, pkg_version)
     cached_entry = cache.get(cache_key)
-    return cached_entry.get("vuln_type") if cached_entry else None
+    if cached_entry is None:
+        return (False, None)
+    return (True, cached_entry.get("dep_type"))
 
 
 def update_cache(
     cache: Dict[str, Dict[str, Any]],
     pkg_name: str,
     pkg_version: str,
-    vuln_type: Optional[str],
+    dep_type: Optional[str],
 ) -> None:
     """Update cache with vulnerability result."""
     cache_key = get_cache_key(pkg_name, pkg_version)
     ttl = generate_cache_ttl()
-    cache[cache_key] = {"vuln_type": vuln_type, "expires_at": time.time() + ttl}
+    cache[cache_key] = {"dep_type": dep_type, "expires_at": time.time() + ttl}

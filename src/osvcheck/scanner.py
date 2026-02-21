@@ -105,12 +105,12 @@ class PackageScanner:
 
             self.stats.packages_scanned += 1
 
-            cached = get_cached_result(cache, pkg_name, pkg_version)
-            if cached:
+            cached_found, cached_vuln = get_cached_result(cache, pkg_name, pkg_version)
+            if cached_found:
                 self.stats.cache_hits += 1
                 dep_type = "direct" if is_direct else "indirect"
                 logger.debug("  %s:%s cache hit (%s)", pkg_name, pkg_version, dep_type)
-                if cached in ("direct", "indirect"):
+                if cached_vuln in ("direct", "indirect"):
                     (direct_vulnerable if is_direct else indirect_vulnerable).append(
                         pkg_name
                     )
@@ -149,10 +149,10 @@ class PackageScanner:
                 ):
                     vuln_status = "vulnerability" if has_vuln else "no vulnerability"
                     logger.debug("  %s:%s %s", pkg_name, pkg_version, vuln_status)
-                    vuln_type = (
+                    cached_dep_type = (
                         ("direct" if is_direct else "indirect") if has_vuln else None
                     )
-                    update_cache(cache, pkg_name, pkg_version, vuln_type)
+                    update_cache(cache, pkg_name, pkg_version, cached_dep_type)
 
                     if has_vuln:
                         (
