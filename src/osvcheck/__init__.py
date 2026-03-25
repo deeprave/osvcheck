@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from .cache import load_cache, save_cache
-from .cli import get_log_level, parse_args
+from .cli import get_cli_exceptions, get_log_level, parse_args
 from .config import load_exceptions
 from .dependencies import get_direct_dependencies
 from .log import setup_logging
@@ -170,17 +170,20 @@ def main() -> None:
     else:
         logger.info("Checking %d packages...", len(all_packages))
 
-    # Load exceptions config
+    # Load exceptions: config file (with expiry) + CLI (no expiry required)
     exceptions = load_exceptions(Path.cwd())
+    cli_exceptions = set(get_cli_exceptions(args))
     if exceptions:
-        logger.debug("Loaded %d exception(s)", len(exceptions))
+        logger.debug("Loaded %d exception(s) from config", len(exceptions))
+    if cli_exceptions:
+        logger.debug("CLI exceptions: %s", ", ".join(sorted(cli_exceptions)))
 
     # Scan for vulnerabilities
     direct_vulnerable, indirect_vulnerable = scanner.scan_packages(direct_deps, cache)
 
-    # Apply exceptions: warn on expired, suppress active ones
-    if exceptions:
-        active = {e.package for e in exceptions if e.is_active()}
+    # Apply exceptions: warn on expired config exceptions, suppress active ones and CLI ones
+    if exceptions or cli_exceptions:
+        active = {e.package for e in exceptions if e.is_active()} | cli_exceptions
         for e in exceptions:
             if not e.is_active():
                 reason_str = f" ({e.reason})" if e.reason else ""
@@ -191,15 +194,19 @@ def main() -> None:
                     reason_str,
                 )
         for pkg in direct_vulnerable + indirect_vulnerable:
-            if pkg.lower() in active:
-                e = next(ex for ex in exceptions if ex.package == pkg.lower())
-                reason_str = f" ({e.reason})" if e.reason else ""
-                logger.info(
-                    "  [ignored] %s: suppressed until %s%s",
-                    pkg,
-                    e.expires.isoformat(),
-                    reason_str,
-                )
+            pkg_lower = pkg.lower()
+            if pkg_lower in active:
+                if pkg_lower in cli_exceptions:
+                    logger.info("  [ignored] %s: suppressed via -x/--exception", pkg)
+                else:
+                    e = next(ex for ex in exceptions if ex.package == pkg_lower)
+                    reason_str = f" ({e.reason})" if e.reason else ""
+                    logger.info(
+                        "  [ignored] %s: suppressed until %s%s",
+                        pkg,
+                        e.expires.isoformat(),
+                        reason_str,
+                    )
         direct_vulnerable = [p for p in direct_vulnerable if p.lower() not in active]
         indirect_vulnerable = [
             p for p in indirect_vulnerable if p.lower() not in active

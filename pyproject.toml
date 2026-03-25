@@ -32,6 +32,9 @@ osvcheck = "osvcheck:main"
 requires = ["uv_build>=0.9.27,<0.11.0"]
 build-backend = "uv_build"
 
+[tool.osvcheck.exceptions]
+pygments = { expires = 2026-04-30, reason = "CWE-1333 ReDOS not yet fixed" }
+
 [dependency-groups]
 dev = [
     "mypy>=1.19.1",

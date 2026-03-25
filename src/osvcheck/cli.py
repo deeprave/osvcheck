@@ -3,6 +3,8 @@
 import argparse
 import logging
 from pathlib import Path
+from typing import List
+from typing import List
 
 
 def parse_args() -> argparse.Namespace:
@@ -57,7 +59,28 @@ def parse_args() -> argparse.Namespace:
         help="Only show warnings and errors",
     )
 
+    parser.add_argument(
+        "-x",
+        "--exception",
+        dest="exceptions",
+        action="append",
+        default=[],
+        metavar="PKG[,PKG...]",
+        help="Ignore vulnerability for package(s); comma-separated, repeatable",
+    )
+
     return parser.parse_args()
+
+
+def get_cli_exceptions(args: argparse.Namespace) -> List[str]:
+    """Flatten and normalise -x/--exception values into a list of package names."""
+    packages = []
+    for value in args.exceptions:
+        for pkg in value.split(","):
+            pkg = pkg.strip().lower()
+            if pkg:
+                packages.append(pkg)
+    return packages
 
 
 def get_log_level(args: argparse.Namespace) -> int:
