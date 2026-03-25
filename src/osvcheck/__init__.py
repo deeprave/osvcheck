@@ -7,6 +7,7 @@ from typing import Optional, Tuple
 
 from .cache import load_cache, save_cache
 from .cli import get_log_level, parse_args
+from .config import load_exceptions
 from .dependencies import get_direct_dependencies
 from .log import setup_logging
 from .osv import OSVClient
@@ -169,8 +170,38 @@ def main() -> None:
     else:
         logger.info("Checking %d packages...", len(all_packages))
 
+    # Load exceptions config
+    exceptions = load_exceptions(Path.cwd())
+    if exceptions:
+        logger.debug("Loaded %d exception(s)", len(exceptions))
+
     # Scan for vulnerabilities
     direct_vulnerable, indirect_vulnerable = scanner.scan_packages(direct_deps, cache)
+
+    # Apply exceptions: warn on expired, suppress active ones
+    if exceptions:
+        active = {e.package for e in exceptions if e.is_active()}
+        for e in exceptions:
+            if not e.is_active():
+                reason_str = f" ({e.reason})" if e.reason else ""
+                logger.warning(
+                    "  [expired exception] %s: expired %s%s — vulnerability will be reported",
+                    e.package,
+                    e.expires.isoformat(),
+                    reason_str,
+                )
+        for pkg in direct_vulnerable + indirect_vulnerable:
+            if pkg.lower() in active:
+                e = next(ex for ex in exceptions if ex.package == pkg.lower())
+                reason_str = f" ({e.reason})" if e.reason else ""
+                logger.info(
+                    "  [ignored] %s: suppressed until %s%s",
+                    pkg,
+                    e.expires.isoformat(),
+                    reason_str,
+                )
+        direct_vulnerable = [p for p in direct_vulnerable if p.lower() not in active]
+        indirect_vulnerable = [p for p in indirect_vulnerable if p.lower() not in active]
 
     # Log statistics
     logger.info(
@@ -186,13 +217,6 @@ def main() -> None:
     save_cache(cache, CACHE_FILE)
     logger.debug("Cache saved to %s", CACHE_FILE)
 
-    report_results(direct_vulnerable, indirect_vulnerable)
-
-    # Exit with appropriate code
-    exit(determine_exit_code(direct_vulnerable, indirect_vulnerable))
-
-    # Save cache and report
-    save_cache(cache, CACHE_FILE)
     report_results(direct_vulnerable, indirect_vulnerable)
 
     # Exit with appropriate code
