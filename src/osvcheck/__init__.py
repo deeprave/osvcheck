@@ -201,7 +201,9 @@ def main() -> None:
                     reason_str,
                 )
         direct_vulnerable = [p for p in direct_vulnerable if p.lower() not in active]
-        indirect_vulnerable = [p for p in indirect_vulnerable if p.lower() not in active]
+        indirect_vulnerable = [
+            p for p in indirect_vulnerable if p.lower() not in active
+        ]
 
     # Log statistics
     logger.info(
