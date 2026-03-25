@@ -1,6 +1,6 @@
 [project]
 name = "osvcheck"
-version = "1.0.1"
+version = "1.2.0"
 description = "Security vulnerability scanner for Python dependencies"
 readme = "README.md"
 authors = [
