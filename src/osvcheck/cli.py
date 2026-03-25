@@ -4,7 +4,6 @@ import argparse
 import logging
 from pathlib import Path
 from typing import List
-from typing import List
 
 
 def parse_args() -> argparse.Namespace:
