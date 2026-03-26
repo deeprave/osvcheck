@@ -2,8 +2,14 @@
 """osvcheck - Lightweight vulnerability scanner for Python dependencies."""
 
 import logging
+from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
 from typing import Optional, Tuple
+
+try:
+    __version__ = version("osvcheck")
+except PackageNotFoundError:
+    __version__ = "unknown"
 
 from .cache import load_cache, save_cache
 from .cli import get_cli_exceptions, get_log_level, parse_args

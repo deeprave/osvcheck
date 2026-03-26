@@ -5,6 +5,8 @@ import logging
 from pathlib import Path
 from typing import List
 
+from . import __version__
+
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
@@ -12,6 +14,7 @@ def parse_args() -> argparse.Namespace:
         prog="osvcheck",
         description="Lightweight vulnerability scanner for Python dependencies",
     )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
 
     # Logging options
     parser.add_argument(
