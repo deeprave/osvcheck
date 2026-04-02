@@ -14,7 +14,9 @@ def parse_args() -> argparse.Namespace:
         prog="osvcheck",
         description="Lightweight vulnerability scanner for Python dependencies",
     )
-    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {__version__}"
+    )
 
     # Logging options
     parser.add_argument(
