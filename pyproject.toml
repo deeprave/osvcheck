@@ -1,6 +1,6 @@
 [project]
 name = "osvcheck"
-version = "1.2.1"
+version = "1.2.2"
 description = "Security vulnerability scanner for Python dependencies"
 readme = "README.md"
 authors = [
@@ -31,9 +31,6 @@ osvcheck = "osvcheck:main"
 [build-system]
 requires = ["uv_build>=0.9.27,<0.11.0"]
 build-backend = "uv_build"
-
-[tool.osvcheck.exceptions]
-pygments = { expires = 2026-04-30, reason = "CWE-1333 ReDOS not yet fixed" }
 
 [dependency-groups]
 dev = [
