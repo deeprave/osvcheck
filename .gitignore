@@ -48,7 +48,6 @@ Thumbs.db
 
 # uv
 .uv/
-uv.lock
 
 # AI
 .guide.yaml
