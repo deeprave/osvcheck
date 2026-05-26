@@ -1,8 +1,11 @@
 """Tests for package detection."""
 
+import subprocess
 import time
 
-from osvcheck.package_detection import is_uv_lock_current, parse_uv_lock
+import pytest
+
+from osvcheck import package_detection
 
 
 def test_parse_uv_lock(tmp_path):
@@ -20,7 +23,7 @@ version = "2.0.0"
 """
     )
 
-    packages = parse_uv_lock(uv_lock)
+    packages = package_detection.parse_uv_lock(uv_lock)
     assert len(packages) == 2
     assert packages[0] == {"name": "requests", "version": "2.31.0"}
     assert packages[1] == {"name": "urllib3", "version": "2.0.0"}
@@ -29,40 +32,95 @@ version = "2.0.0"
 def test_parse_uv_lock_missing_file(tmp_path):
     """Test parsing missing uv.lock file."""
     uv_lock = tmp_path / "missing.lock"
-    packages = parse_uv_lock(uv_lock)
+    packages = package_detection.parse_uv_lock(uv_lock)
     assert packages == []
 
 
-def test_is_uv_lock_current(tmp_path):
-    """Test uv.lock staleness detection."""
+@pytest.mark.parametrize(
+    ("uv_returncode", "expected"),
+    [(0, True), (1, False)],
+    ids=["current", "stale"],
+)
+def test_is_uv_lock_current_uses_uv_lock_check(
+    tmp_path, monkeypatch, uv_returncode, expected
+):
+    """Use uv's own lock check when uv is available."""
+    uv_lock = tmp_path / "uv.lock"
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text("[project]\nname = 'test'")
+    uv_lock.write_text("[[package]]")
+
+    monkeypatch.setattr(package_detection, "is_uv_available", lambda: True)
+
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return subprocess.CompletedProcess(command, uv_returncode)
+
+    monkeypatch.setattr(package_detection.subprocess, "run", fake_run)
+
+    assert package_detection.is_uv_lock_current(tmp_path) is expected
+    assert calls == [
+        (
+            ["uv", "lock", "--check"],
+            {
+                "cwd": tmp_path,
+                "capture_output": True,
+                "text": True,
+                "check": False,
+            },
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    ("lock_after_pyproject", "expected"),
+    [(True, True), (False, False)],
+    ids=["lock-newer", "pyproject-newer"],
+)
+def test_is_uv_lock_current_falls_back_to_mtime_when_uv_is_unavailable(
+    tmp_path, monkeypatch, lock_after_pyproject, expected
+):
+    """Fall back to mtime comparison when uv is unavailable."""
     uv_lock = tmp_path / "uv.lock"
     pyproject = tmp_path / "pyproject.toml"
 
-    # Create pyproject first
-    pyproject.write_text("[project]\nname = 'test'")
-    time.sleep(0.01)
+    monkeypatch.setattr(package_detection, "is_uv_available", lambda: False)
 
-    # Create uv.lock after (current)
-    uv_lock.write_text("[[package]]")
+    if lock_after_pyproject:
+        pyproject.write_text("[project]\nname = 'test'")
+        time.sleep(0.01)
+        uv_lock.write_text("[[package]]")
+    else:
+        uv_lock.write_text("[[package]]")
+        time.sleep(0.01)
+        pyproject.write_text("[project]\nname = 'test'")
 
-    assert is_uv_lock_current(tmp_path)
+    assert package_detection.is_uv_lock_current(tmp_path) is expected
 
 
-def test_is_uv_lock_stale(tmp_path):
-    """Test detecting stale uv.lock."""
+def test_is_uv_lock_current_falls_back_to_mtime_when_uv_check_fails(
+    tmp_path, monkeypatch
+):
+    """Fall back to mtime comparison if invoking uv fails."""
     uv_lock = tmp_path / "uv.lock"
     pyproject = tmp_path / "pyproject.toml"
 
-    # Create uv.lock first
-    uv_lock.write_text("[[package]]")
-    time.sleep(0.01)
-
-    # Update pyproject after (makes lock stale)
     pyproject.write_text("[project]\nname = 'test'")
+    time.sleep(0.01)
+    uv_lock.write_text("[[package]]")
 
-    assert not is_uv_lock_current(tmp_path)
+    monkeypatch.setattr(package_detection, "is_uv_available", lambda: True)
+
+    def fake_run(command, **kwargs):
+        raise OSError("uv failed")
+
+    monkeypatch.setattr(package_detection.subprocess, "run", fake_run)
+
+    assert package_detection.is_uv_lock_current(tmp_path)
 
 
 def test_is_uv_lock_current_missing_files(tmp_path):
     """Test when files don't exist."""
-    assert not is_uv_lock_current(tmp_path)
+    assert not package_detection.is_uv_lock_current(tmp_path)
