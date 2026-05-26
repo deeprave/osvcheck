@@ -100,8 +100,44 @@ def test_is_uv_lock_current_falls_back_to_mtime_when_uv_is_unavailable(
     assert package_detection.is_uv_lock_current(tmp_path) is expected
 
 
+@pytest.mark.parametrize(
+    ("lock_after_pyproject", "expected"),
+    [(True, True), (False, False)],
+    ids=["lock-newer", "pyproject-newer"],
+)
+def test_is_uv_lock_current_falls_back_to_mtime_for_unexpected_uv_exit(
+    tmp_path, monkeypatch, lock_after_pyproject, expected
+):
+    """Fall back to mtime comparison for unexpected uv return codes."""
+    uv_lock = tmp_path / "uv.lock"
+    pyproject = tmp_path / "pyproject.toml"
+
+    monkeypatch.setattr(package_detection, "is_uv_available", lambda: True)
+
+    if lock_after_pyproject:
+        pyproject.write_text("[project]\nname = 'test'")
+        time.sleep(0.01)
+        uv_lock.write_text("[[package]]")
+    else:
+        uv_lock.write_text("[[package]]")
+        time.sleep(0.01)
+        pyproject.write_text("[project]\nname = 'test'")
+
+    def fake_run(command, **kwargs):
+        return subprocess.CompletedProcess(command, 2)
+
+    monkeypatch.setattr(package_detection.subprocess, "run", fake_run)
+
+    assert package_detection.is_uv_lock_current(tmp_path) is expected
+
+
+@pytest.mark.parametrize(
+    "uv_error",
+    [OSError("uv failed"), subprocess.SubprocessError("uv failed")],
+    ids=["os-error", "subprocess-error"],
+)
 def test_is_uv_lock_current_falls_back_to_mtime_when_uv_check_fails(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, uv_error
 ):
     """Fall back to mtime comparison if invoking uv fails."""
     uv_lock = tmp_path / "uv.lock"
@@ -114,11 +150,32 @@ def test_is_uv_lock_current_falls_back_to_mtime_when_uv_check_fails(
     monkeypatch.setattr(package_detection, "is_uv_available", lambda: True)
 
     def fake_run(command, **kwargs):
-        raise OSError("uv failed")
+        raise uv_error
 
     monkeypatch.setattr(package_detection.subprocess, "run", fake_run)
 
     assert package_detection.is_uv_lock_current(tmp_path)
+
+
+def test_is_uv_lock_current_does_not_hide_unexpected_uv_check_errors(
+    tmp_path, monkeypatch
+):
+    """Only expected subprocess failures fall back to mtime comparison."""
+    uv_lock = tmp_path / "uv.lock"
+    pyproject = tmp_path / "pyproject.toml"
+
+    pyproject.write_text("[project]\nname = 'test'")
+    uv_lock.write_text("[[package]]")
+
+    monkeypatch.setattr(package_detection, "is_uv_available", lambda: True)
+
+    def fake_run(command, **kwargs):
+        raise TypeError("programming error")
+
+    monkeypatch.setattr(package_detection.subprocess, "run", fake_run)
+
+    with pytest.raises(TypeError, match="programming error"):
+        package_detection.is_uv_lock_current(tmp_path)
 
 
 def test_is_uv_lock_current_missing_files(tmp_path):
