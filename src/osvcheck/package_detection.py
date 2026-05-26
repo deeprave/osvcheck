@@ -18,6 +18,19 @@ def is_uv_lock_current(project_root: Path) -> bool:
     if not uv_lock.exists() or not pyproject.exists():
         return False
 
+    if is_uv_available():
+        try:
+            result = subprocess.run(
+                ["uv", "lock", "--check"],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            return result.returncode == 0
+        except Exception:
+            pass
+
     return uv_lock.stat().st_mtime >= pyproject.stat().st_mtime
 
 

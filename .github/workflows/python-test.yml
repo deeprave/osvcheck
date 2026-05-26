@@ -12,32 +12,32 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
-    
+
     steps:
     - uses: actions/checkout@v6
-    
+
     - name: Install uv
       uses: astral-sh/setup-uv@v7
       with:
         enable-cache: true
-    
+
     - name: Set up Python ${{ matrix.python-version }}
       run: uv python install ${{ matrix.python-version }}
-    
+
     - name: Install dependencies
       run: uv sync --all-extras --dev
-    
+
     - name: Run ruff format check
       run: uv run ruff format --check
-    
+
     - name: Run ruff lint
       run: uv run ruff check
-    
+
     - name: Run mypy
       run: uv run mypy src/osvcheck
-    
+
     - name: Run pytest
       run: uv run pytest -v
-    
+
     - name: Run osvcheck
       run: uv run osvcheck
