@@ -27,8 +27,9 @@ def is_uv_lock_current(project_root: Path) -> bool:
                 text=True,
                 check=False,
             )
-            return result.returncode == 0
-        except Exception:
+            if result.returncode in (0, 1):
+                return result.returncode == 0
+        except (subprocess.SubprocessError, OSError):
             pass
 
     return uv_lock.stat().st_mtime >= pyproject.stat().st_mtime
