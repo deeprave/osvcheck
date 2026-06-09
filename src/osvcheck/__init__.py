@@ -17,7 +17,12 @@ from .config import load_exceptions
 from .dependencies import get_direct_dependencies
 from .log import setup_logging
 from .osv import OSVClient
-from .package_detection import is_pip_available, is_uv_available, is_uv_lock_current
+from .package_detection import (
+    find_uv_lock_path,
+    is_pip_available,
+    is_uv_available,
+    is_uv_lock_current,
+)
 from .scanner import (
     PackageLister,
     PackageScanner,
@@ -38,12 +43,12 @@ def detect_package_lister() -> Tuple[PackageLister, Optional[str]]:
     """
     project_root = Path.cwd()
     pyproject = project_root / "pyproject.toml"
-    uv_lock = project_root / "uv.lock"
+    uv_lock = find_uv_lock_path(project_root)
     warning = None
 
     logger.debug("Detecting package manager...")
     logger.debug("  pyproject.toml exists: %s", pyproject.exists())
-    logger.debug("  uv.lock exists: %s", uv_lock.exists())
+    logger.debug("  uv.lock path: %s", uv_lock)
 
     # If no pyproject.toml, not a uv project - require pip
     if not pyproject.exists():
@@ -59,8 +64,8 @@ def detect_package_lister() -> Tuple[PackageLister, Optional[str]]:
         )
 
     # pyproject.toml exists - check uv.lock
-    if uv_lock.exists():
-        if is_uv_lock_current(project_root):
+    if uv_lock is not None:
+        if is_uv_lock_current(project_root, uv_lock=uv_lock):
             logger.debug("  uv.lock is current")
             logger.debug("  Selected package lister: UvLockPackageLister")
             return UvLockPackageLister(uv_lock), None

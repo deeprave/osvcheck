@@ -36,6 +36,40 @@ def test_parse_uv_lock_missing_file(tmp_path):
     assert packages == []
 
 
+def test_find_uv_lock_path_in_workspace_member(tmp_path):
+    """Find uv.lock from a uv workspace member using workspace metadata."""
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir()
+    member_root = workspace_root / "members" / "api"
+    member_root.mkdir(parents=True)
+
+    (workspace_root / "pyproject.toml").write_text(
+        """[project]\nname = 'workspace'\n\n[tool.uv.workspace]\nmembers = ['members/*']\n"""
+    )
+    (workspace_root / "uv.lock").write_text("")
+    (member_root / "pyproject.toml").write_text("[project]\nname = 'api'\n")
+
+    assert (
+        package_detection.find_uv_lock_path(member_root) == workspace_root / "uv.lock"
+    )
+
+
+def test_find_uv_lock_path_does_not_look_in_unrelated_parent(tmp_path):
+    """Only resolve to parent lockfiles when workspace membership is explicit."""
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir()
+    (workspace_root / "pyproject.toml").write_text(
+        """[project]\nname = 'workspace'\n\n[tool.uv.workspace]\nmembers = ['other']\n"""
+    )
+    (workspace_root / "uv.lock").write_text("")
+
+    child = tmp_path / "not-member"
+    child.mkdir()
+    (child / "pyproject.toml").write_text("[project]\nname = 'not-member'\n")
+
+    assert package_detection.find_uv_lock_path(child) is None
+
+
 @pytest.mark.parametrize(
     ("uv_returncode", "expected"),
     [(0, True), (1, False)],
@@ -72,6 +106,32 @@ def test_is_uv_lock_current_uses_uv_lock_check(
             },
         )
     ]
+
+
+def test_is_uv_lock_current_for_workspace_lock_parent(tmp_path, monkeypatch):
+    """Run uv lock check from the workspace root, not member directory."""
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir()
+    member_root = workspace_root / "member"
+    member_root.mkdir()
+
+    (workspace_root / "pyproject.toml").write_text("[project]\nname = 'workspace'\n")
+    (member_root / "pyproject.toml").write_text("[project]\nname = 'member'\n")
+
+    uv_lock = workspace_root / "uv.lock"
+    uv_lock.write_text("[metadata]\n")
+
+    calls = []
+    monkeypatch.setattr(package_detection, "is_uv_available", lambda: True)
+
+    def fake_run(command, **kwargs):
+        calls.append(kwargs["cwd"])
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(package_detection.subprocess, "run", fake_run)
+
+    assert package_detection.is_uv_lock_current(member_root, uv_lock=uv_lock)
+    assert calls == [workspace_root]
 
 
 @pytest.mark.parametrize(

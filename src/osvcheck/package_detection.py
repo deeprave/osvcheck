@@ -3,16 +3,82 @@
 import importlib.util
 import json
 import shutil
+import fnmatch
 import subprocess
 import sys
 import tomllib
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 
-def is_uv_lock_current(project_root: Path) -> bool:
-    """Check if uv.lock is up-to-date with pyproject.toml."""
-    uv_lock = project_root / "uv.lock"
+def _read_pyproject(path: Path) -> dict:
+    """Read a pyproject.toml file safely."""
+    try:
+        with open(path, "rb") as f:
+            return tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError):
+        return {}
+
+
+def _is_workspace_member(
+    project_root: Path, workspace_root: Path, members: List[str]
+) -> bool:
+    """Check whether project_root is listed as a workspace member."""
+    try:
+        relative = project_root.resolve().relative_to(workspace_root.resolve())
+    except ValueError:
+        return False
+
+    relative_posix = relative.as_posix()
+
+    if relative_posix == ".":
+        return any(member.strip() in {".", "./", ""} for member in members)
+
+    for member in members:
+        normalized_member = str(member).strip().replace("\\", "/").strip()
+        if normalized_member == ".":
+            continue
+        if fnmatch.fnmatch(relative_posix, normalized_member):
+            return True
+
+    return False
+
+
+def find_uv_lock_path(project_root: Path) -> Optional[Path]:
+    """Find the uv.lock file for a project, including uv workspace members."""
+    local_lock = project_root / "uv.lock"
+    if local_lock.exists():
+        return local_lock
+
+    for candidate_root in [project_root, *project_root.parents]:
+        candidate_pyproject = candidate_root / "pyproject.toml"
+        if not candidate_pyproject.exists():
+            continue
+
+        data = _read_pyproject(candidate_pyproject)
+        members = (
+            data.get("tool", {}).get("uv", {}).get("workspace", {}).get("members", [])
+        )
+        if not isinstance(members, list):
+            continue
+
+        candidate_lock = candidate_root / "uv.lock"
+        if not candidate_lock.exists():
+            continue
+
+        if _is_workspace_member(project_root, candidate_root, members):
+            return candidate_lock
+
+    return None
+
+
+def is_uv_lock_current(project_root: Path, uv_lock: Optional[Path] = None) -> bool:
+    """Check if uv.lock is up-to-date with its pyproject.toml."""
+    if uv_lock is None:
+        uv_lock = project_root / "uv.lock"
+    else:
+        project_root = uv_lock.parent
+
     pyproject = project_root / "pyproject.toml"
 
     if not uv_lock.exists() or not pyproject.exists():
