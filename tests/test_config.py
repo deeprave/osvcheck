@@ -166,7 +166,7 @@ def test_exception_with_expiry_and_permanent_flag_is_skipped(tmp_path):
     """Ambiguous exception lifetimes must not silently suppress findings."""
     write_toml(
         tmp_path / "osvcheck.toml",
-        f"[exceptions]\\nrequests = {{ expires = {FUTURE}, permanent = true }}\\n",
+        f"[exceptions]\nrequests = {{ expires = {FUTURE}, permanent = true }}\n",
     )
     assert load_exceptions(tmp_path) == []
 
