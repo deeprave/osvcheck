@@ -63,6 +63,25 @@ osvcheck || [ $? -eq 1 ]
 osvcheck
 ```
 
+## Exceptions
+
+Suppress an accepted finding in `pyproject.toml` under
+`[tool.osvcheck.exceptions]`, or in `osvcheck.toml` under `[exceptions]`.
+Each exception needs either a review date or an explicit permanent flag:
+
+```toml
+[tool.osvcheck.exceptions]
+# Review a temporary exception before this date.
+requests = { expires = 2026-06-01, reason = "Waiting for an upstream release." }
+
+# httpx requires certifi, but this project configures httpx to use the system
+# keychain rather than certifi's CA bundle.
+certifi = { permanent = true, reason = "httpx uses the system keychain." }
+```
+
+`expires` and `permanent = true` are mutually exclusive. A standalone
+`osvcheck.toml` takes precedence when both configuration files are present.
+
 ## Features
 
 - Scans Python dependencies for known security vulnerabilities

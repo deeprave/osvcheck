@@ -3,7 +3,6 @@
 import re
 import tomllib
 from pathlib import Path
-from typing import List
 
 
 def parse_package_name(dep_spec: str) -> str:
@@ -16,17 +15,17 @@ def parse_package_name(dep_spec: str) -> str:
     return re.split(r"[<>=\[~!]", dep_spec)[0].strip().lower()
 
 
-def get_direct_dependencies(pyproject_path: Path) -> List[str]:
+def get_direct_dependencies(pyproject_path: Path) -> list[str]:
     """Get list of direct dependency names from pyproject.toml."""
     try:
         with open(pyproject_path, "rb") as f:
             data = tomllib.load(f)
         deps = data.get("project", {}).get("dependencies", [])
         return [parse_package_name(dep) for dep in deps]
-    except Exception:
+    except (OSError, tomllib.TOMLDecodeError, AttributeError, TypeError):
         return []
 
 
-def is_direct_dependency(pkg_name: str, direct_deps: List[str]) -> bool:
+def is_direct_dependency(pkg_name: str, direct_deps: list[str]) -> bool:
     """Check if package is a direct dependency."""
     return pkg_name.lower() in direct_deps

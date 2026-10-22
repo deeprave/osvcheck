@@ -69,6 +69,19 @@ def test_pyproject_toml_exceptions(tmp_path):
     assert result[0].package == "pillow"
 
 
+def test_pyproject_toml_permanent_exception(tmp_path):
+    """A permanent exception remains active without an artificial expiry date."""
+    write_toml(
+        tmp_path / "pyproject.toml",
+        '[tool.osvcheck.exceptions]\ncertifi = { permanent = true, reason = "httpx uses the system keychain" }\n',
+    )
+    result = load_exceptions(tmp_path)
+    assert len(result) == 1
+    assert result[0].package == "certifi"
+    assert result[0].is_permanent()
+    assert result[0].is_active()
+
+
 def test_pyproject_toml_no_osvcheck_section(tmp_path):
     write_toml(tmp_path / "pyproject.toml", "[project]\nname = 'myapp'\n")
     assert load_exceptions(tmp_path) == []
@@ -139,6 +152,15 @@ def test_missing_expires_skipped(tmp_path):
     write_toml(
         tmp_path / "osvcheck.toml",
         "[exceptions]\nrequests = { reason = 'no expiry set' }\n",
+    )
+    assert load_exceptions(tmp_path) == []
+
+
+def test_exception_with_expiry_and_permanent_flag_is_skipped(tmp_path):
+    """Ambiguous exception lifetimes must not silently suppress findings."""
+    write_toml(
+        tmp_path / "osvcheck.toml",
+        f"[exceptions]\\nrequests = {{ expires = {FUTURE}, permanent = true }}\\n",
     )
     assert load_exceptions(tmp_path) == []
 

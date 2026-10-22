@@ -3,7 +3,6 @@
 import argparse
 import logging
 from pathlib import Path
-from typing import List
 
 from . import __version__
 
@@ -76,7 +75,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def get_cli_exceptions(args: argparse.Namespace) -> List[str]:
+def get_cli_exceptions(args: argparse.Namespace) -> list[str]:
     """Flatten and normalise -x/--exception values into a list of package names."""
     packages = []
     for value in args.exceptions:

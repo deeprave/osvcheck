@@ -6,7 +6,7 @@ import logging
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import ClassVar
 
 
 def is_rich_available() -> bool:
@@ -32,7 +32,7 @@ class JSONFormatter(logging.Formatter):
 class ColorFormatter(logging.Formatter):
     """Color log formatter for console output."""
 
-    COLORS = {
+    COLORS: ClassVar[dict[str, str]] = {
         "DEBUG": "\033[36m",  # Cyan
         "INFO": "\033[32m",  # Green
         "WARNING": "\033[33m",  # Yellow
@@ -50,9 +50,9 @@ class ColorFormatter(logging.Formatter):
 
 def setup_logging(
     level: int = logging.INFO,
-    log_file: Optional[Path] = None,
+    log_file: Path | None = None,
     use_json: bool = False,
-    use_color: Optional[bool] = None,
+    use_color: bool | None = None,
     use_rich: bool = True,
 ) -> logging.Logger:
     """Setup and configure logging.

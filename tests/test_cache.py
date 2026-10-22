@@ -3,6 +3,8 @@
 import time
 
 from osvcheck.cache import (
+    CACHE_MAX_TTL,
+    CACHE_MIN_TTL,
     generate_cache_ttl,
     get_cache_key,
     get_cached_result,
@@ -10,8 +12,6 @@ from osvcheck.cache import (
     load_cache,
     save_cache,
     update_cache,
-    CACHE_MIN_TTL,
-    CACHE_MAX_TTL,
 )
 
 
