@@ -22,6 +22,12 @@ def test_no_config_files(tmp_path):
     assert load_exceptions(tmp_path) == []
 
 
+def test_osvcheck_toml_invalid_utf8(tmp_path):
+    (tmp_path / "osvcheck.toml").write_bytes(b"\xff")
+
+    assert load_exceptions(tmp_path) == []
+
+
 def test_osvcheck_toml_no_exceptions_section(tmp_path):
     write_toml(tmp_path / "osvcheck.toml", "")
     assert load_exceptions(tmp_path) == []

@@ -94,7 +94,7 @@ def is_uv_lock_current(project_root: Path, uv_lock: Path | None = None) -> bool:
             )
             if result.returncode in (0, 1):
                 return result.returncode == 0
-        except (subprocess.SubprocessError, OSError):
+        except (subprocess.SubprocessError, OSError, UnicodeDecodeError):
             pass
 
     return uv_lock.stat().st_mtime >= pyproject.stat().st_mtime
@@ -113,6 +113,7 @@ def parse_uv_lock(uv_lock_path: Path) -> list[dict[str, str]]:
         return packages
     except (
         OSError,
+        UnicodeDecodeError,
         tomllib.TOMLDecodeError,
         AttributeError,
         KeyError,
@@ -141,7 +142,12 @@ def get_packages_via_uv() -> list[dict[str, str]]:
             check=True,
         )
         return json.loads(result.stdout)
-    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+    except (
+        OSError,
+        UnicodeDecodeError,
+        subprocess.SubprocessError,
+        json.JSONDecodeError,
+    ):
         return []
 
 
@@ -155,5 +161,10 @@ def get_packages_via_pip() -> list[dict[str, str]]:
             check=True,
         )
         return json.loads(result.stdout)
-    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+    except (
+        OSError,
+        UnicodeDecodeError,
+        subprocess.SubprocessError,
+        json.JSONDecodeError,
+    ):
         return []

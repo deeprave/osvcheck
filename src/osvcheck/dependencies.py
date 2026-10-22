@@ -22,7 +22,13 @@ def get_direct_dependencies(pyproject_path: Path) -> list[str]:
             data = tomllib.load(f)
         deps = data.get("project", {}).get("dependencies", [])
         return [parse_package_name(dep) for dep in deps]
-    except (OSError, tomllib.TOMLDecodeError, AttributeError, TypeError):
+    except (
+        OSError,
+        UnicodeDecodeError,
+        tomllib.TOMLDecodeError,
+        AttributeError,
+        TypeError,
+    ):
         return []
 
 

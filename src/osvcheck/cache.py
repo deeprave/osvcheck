@@ -37,7 +37,13 @@ def load_cache(cache_file: Path) -> dict[str, dict[str, Any]]:
         # Remove expired entries
         current_time = time.time()
         return {k: v for k, v in cache.items() if is_cache_entry_valid(v, current_time)}
-    except (OSError, json.JSONDecodeError, AttributeError, TypeError):
+    except (
+        OSError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        AttributeError,
+        TypeError,
+    ):
         return {}
 
 

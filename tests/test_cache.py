@@ -41,6 +41,13 @@ def test_load_cache_missing_file(tmp_path):
     assert cache == {}
 
 
+def test_load_cache_invalid_utf8(tmp_path):
+    cache_file = tmp_path / "cache.json"
+    cache_file.write_bytes(b"\xff")
+
+    assert load_cache(cache_file) == {}
+
+
 def test_load_cache_removes_expired_entries(tmp_path):
     cache_file = tmp_path / "cache.json"
     current = time.time()

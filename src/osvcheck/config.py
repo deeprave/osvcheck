@@ -93,7 +93,7 @@ def load_exceptions(project_root: Path) -> list[PackageException]:
             with open(osvcheck_toml, "rb") as f:
                 data = tomllib.load(f)
             return _parse_exceptions(data.get("exceptions", {}))
-        except (OSError, tomllib.TOMLDecodeError, AttributeError):
+        except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError, AttributeError):
             return []
 
     pyproject = project_root / "pyproject.toml"
@@ -103,7 +103,7 @@ def load_exceptions(project_root: Path) -> list[PackageException]:
                 data = tomllib.load(f)
             raw = data.get("tool", {}).get("osvcheck", {}).get("exceptions", {})
             return _parse_exceptions(raw)
-        except (OSError, tomllib.TOMLDecodeError, AttributeError):
+        except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError, AttributeError):
             return []
 
     return []

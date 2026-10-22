@@ -36,6 +36,27 @@ def test_parse_uv_lock_missing_file(tmp_path):
     assert packages == []
 
 
+def test_parse_uv_lock_invalid_utf8(tmp_path):
+    uv_lock = tmp_path / "uv.lock"
+    uv_lock.write_bytes(b"\xff")
+
+    assert package_detection.parse_uv_lock(uv_lock) == []
+
+
+@pytest.mark.parametrize(
+    "lister",
+    [package_detection.get_packages_via_uv, package_detection.get_packages_via_pip],
+    ids=["uv", "pip"],
+)
+def test_package_listing_invalid_utf8(lister, monkeypatch):
+    def fake_run(*args, **kwargs):
+        raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+
+    monkeypatch.setattr(package_detection.subprocess, "run", fake_run)
+
+    assert lister() == []
+
+
 def test_find_uv_lock_path_in_workspace_member(tmp_path):
     """Find uv.lock from a uv workspace member using workspace metadata."""
     workspace_root = tmp_path / "workspace"
@@ -193,8 +214,12 @@ def test_is_uv_lock_current_falls_back_to_mtime_for_unexpected_uv_exit(
 
 @pytest.mark.parametrize(
     "uv_error",
-    [OSError("uv failed"), subprocess.SubprocessError("uv failed")],
-    ids=["os-error", "subprocess-error"],
+    [
+        OSError("uv failed"),
+        subprocess.SubprocessError("uv failed"),
+        UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte"),
+    ],
+    ids=["os-error", "subprocess-error", "invalid-utf8"],
 )
 def test_is_uv_lock_current_falls_back_to_mtime_when_uv_check_fails(
     tmp_path, monkeypatch, uv_error

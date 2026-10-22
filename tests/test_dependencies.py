@@ -48,6 +48,13 @@ def test_get_direct_dependencies_missing_file(tmp_path):
     assert deps == []
 
 
+def test_get_direct_dependencies_invalid_utf8(tmp_path):
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_bytes(b"\xff")
+
+    assert get_direct_dependencies(pyproject) == []
+
+
 def test_is_direct_dependency():
     direct_deps = ["requests", "django", "flask"]
 
