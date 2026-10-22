@@ -193,9 +193,16 @@ def main() -> None:
 
     # Apply exceptions: warn on expired config exceptions, suppress active ones and CLI ones
     if exceptions or cli_exceptions:
-        active = {e.package for e in exceptions if e.is_active()} | cli_exceptions
+        active_exceptions = {}
+        for exception in exceptions:
+            if exception.is_active() and (
+                exception.package not in active_exceptions or exception.is_permanent()
+            ):
+                active_exceptions[exception.package] = exception
+
+        active = set(active_exceptions) | cli_exceptions
         for e in exceptions:
-            if not e.is_active():
+            if not e.is_active() and e.package not in active_exceptions:
                 reason_str = f" ({e.reason})" if e.reason else ""
                 assert e.expires is not None
                 logger.warning(
@@ -210,7 +217,7 @@ def main() -> None:
                 if pkg_lower in cli_exceptions:
                     logger.info("  [ignored] %s: suppressed via -x/--exception", pkg)
                 else:
-                    e = next(ex for ex in exceptions if ex.package == pkg_lower)
+                    e = active_exceptions[pkg_lower]
                     reason_str = f" ({e.reason})" if e.reason else ""
                     expiry = e.expires
                     if expiry is None:
