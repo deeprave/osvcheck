@@ -42,7 +42,10 @@ def test_main_prefers_active_exception_over_expired_duplicate(monkeypatch, caplo
     monkeypatch.setattr(osvcheck, "PackageScanner", lambda *args: scanner)
     monkeypatch.setattr(osvcheck, "save_cache", lambda cache, path: None)
 
-    with caplog.at_level(logging.INFO, logger="osvcheck"), pytest.raises(SystemExit) as result:
+    with (
+        caplog.at_level(logging.INFO, logger="osvcheck"),
+        pytest.raises(SystemExit) as result,
+    ):
         osvcheck.main()
 
     assert result.value.code == 0
