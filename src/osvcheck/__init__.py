@@ -1,10 +1,9 @@
-#!/usr/bin/env python
 """osvcheck - Lightweight vulnerability scanner for Python dependencies."""
 
 import logging
-from importlib.metadata import version, PackageNotFoundError
+import sys
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Optional, Tuple
 
 try:
     __version__ = version("osvcheck")
@@ -35,7 +34,7 @@ CACHE_FILE = Path(".osvcheck_cache")
 logger = logging.getLogger("osvcheck")
 
 
-def detect_package_lister() -> Tuple[PackageLister, Optional[str]]:
+def detect_package_lister() -> tuple[PackageLister, str | None]:
     """Detect and return appropriate package lister.
 
     Returns:
@@ -181,7 +180,7 @@ def main() -> None:
     else:
         logger.info("Checking %d packages...", len(all_packages))
 
-    # Load exceptions: config file (with expiry) + CLI (no expiry required)
+    # Load exceptions: config file (with optional expiry) + CLI (no expiry required)
     exceptions = load_exceptions(Path.cwd())
     cli_exceptions = set(get_cli_exceptions(args))
     if exceptions:
@@ -194,10 +193,18 @@ def main() -> None:
 
     # Apply exceptions: warn on expired config exceptions, suppress active ones and CLI ones
     if exceptions or cli_exceptions:
-        active = {e.package for e in exceptions if e.is_active()} | cli_exceptions
+        active_exceptions = {}
+        for exception in exceptions:
+            if exception.is_active() and (
+                exception.package not in active_exceptions or exception.is_permanent()
+            ):
+                active_exceptions[exception.package] = exception
+
+        active = set(active_exceptions) | cli_exceptions
         for e in exceptions:
-            if not e.is_active():
+            if not e.is_active() and e.package not in active_exceptions:
                 reason_str = f" ({e.reason})" if e.reason else ""
+                assert e.expires is not None
                 logger.warning(
                     "  [expired exception] %s: expired %s%s — vulnerability will be reported",
                     e.package,
@@ -210,14 +217,22 @@ def main() -> None:
                 if pkg_lower in cli_exceptions:
                     logger.info("  [ignored] %s: suppressed via -x/--exception", pkg)
                 else:
-                    e = next(ex for ex in exceptions if ex.package == pkg_lower)
+                    e = active_exceptions[pkg_lower]
                     reason_str = f" ({e.reason})" if e.reason else ""
-                    logger.info(
-                        "  [ignored] %s: suppressed until %s%s",
-                        pkg,
-                        e.expires.isoformat(),
-                        reason_str,
-                    )
+                    expiry = e.expires
+                    if expiry is None:
+                        logger.info(
+                            "  [ignored] %s: suppressed permanently%s",
+                            pkg,
+                            reason_str,
+                        )
+                    else:
+                        logger.info(
+                            "  [ignored] %s: suppressed until %s%s",
+                            pkg,
+                            expiry.isoformat(),
+                            reason_str,
+                        )
         direct_vulnerable = [p for p in direct_vulnerable if p.lower() not in active]
         indirect_vulnerable = [
             p for p in indirect_vulnerable if p.lower() not in active
@@ -240,7 +255,7 @@ def main() -> None:
     report_results(direct_vulnerable, indirect_vulnerable)
 
     # Exit with appropriate code
-    exit(determine_exit_code(direct_vulnerable, indirect_vulnerable))
+    sys.exit(determine_exit_code(direct_vulnerable, indirect_vulnerable))
 
 
 if __name__ == "__main__":

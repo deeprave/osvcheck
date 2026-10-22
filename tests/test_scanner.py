@@ -1,7 +1,5 @@
 """Tests for scanner logic."""
 
-from typing import Dict, List, Tuple
-
 from osvcheck.scanner import PackageScanner
 
 
@@ -15,18 +13,18 @@ class FakeOSVClient:
         return pkg_name in self.vulnerable_packages
 
     def check_vulnerabilities_batch(
-        self, packages: List[Tuple[str, str]]
-    ) -> Dict[Tuple[str, str], bool]:
+        self, packages: list[tuple[str, str]]
+    ) -> dict[tuple[str, str], bool]:
         return {(name, ver): name in self.vulnerable_packages for name, ver in packages}
 
 
 class FakePackageLister:
     """Fake package lister for testing."""
 
-    def __init__(self, packages: List[Dict[str, str]]):
+    def __init__(self, packages: list[dict[str, str]]):
         self.packages = packages
 
-    def list_packages(self) -> List[Dict[str, str]]:
+    def list_packages(self) -> list[dict[str, str]]:
         return self.packages
 
 

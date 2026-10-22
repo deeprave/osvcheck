@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, Tuple
+from typing import Any, Protocol
 
 from .cache import get_cached_result, update_cache
 from .dependencies import is_direct_dependency
@@ -20,14 +20,14 @@ class ScanStatistics:
         self.cache_misses = 0
         self.api_queries = 0
         self.packages_scanned = 0
-        self.next_expiry: Optional[float] = None
+        self.next_expiry: float | None = None
 
     def update_next_expiry(self, expires_at: float) -> None:
         """Update next expiry time."""
         if self.next_expiry is None or expires_at < self.next_expiry:
             self.next_expiry = expires_at
 
-    def get_next_expiry_str(self) -> Optional[str]:
+    def get_next_expiry_str(self) -> str | None:
         """Get formatted next expiry time."""
         if self.next_expiry:
             return datetime.fromtimestamp(self.next_expiry).strftime(
@@ -39,7 +39,7 @@ class ScanStatistics:
 class PackageLister(Protocol):
     """Protocol for listing installed packages."""
 
-    def list_packages(self) -> List[Dict[str, str]]:
+    def list_packages(self) -> list[dict[str, str]]:
         """Return list of installed packages with 'name' and 'version' keys."""
         ...
 
@@ -50,7 +50,7 @@ class UvLockPackageLister:
     def __init__(self, uv_lock_path: Path):
         self.uv_lock_path = uv_lock_path
 
-    def list_packages(self) -> List[Dict[str, str]]:
+    def list_packages(self) -> list[dict[str, str]]:
         """Get packages from uv.lock."""
         return parse_uv_lock(self.uv_lock_path)
 
@@ -58,7 +58,7 @@ class UvLockPackageLister:
 class UvPackageLister:
     """Package lister using uv pip list."""
 
-    def list_packages(self) -> List[Dict[str, str]]:
+    def list_packages(self) -> list[dict[str, str]]:
         """Get all installed packages using uv."""
         return get_packages_via_uv()
 
@@ -66,7 +66,7 @@ class UvPackageLister:
 class PipPackageLister:
     """Package lister using pip list."""
 
-    def list_packages(self) -> List[Dict[str, str]]:
+    def list_packages(self) -> list[dict[str, str]]:
         """Get all installed packages using pip."""
         return get_packages_via_pip()
 
@@ -80,16 +80,16 @@ class PackageScanner:
         self.stats = ScanStatistics()
 
     def scan_packages(
-        self, direct_deps: List[str], cache: Dict[str, Dict[str, Any]]
-    ) -> Tuple[List[str], List[str]]:
+        self, direct_deps: list[str], cache: dict[str, dict[str, Any]]
+    ) -> tuple[list[str], list[str]]:
         """Scan packages for vulnerabilities.
 
         Returns:
             Tuple of (direct_vulnerable, indirect_vulnerable) package names.
         """
         all_packages = self.package_lister.list_packages()
-        direct_vulnerable: List[str] = []
-        indirect_vulnerable: List[str] = []
+        direct_vulnerable: list[str] = []
+        indirect_vulnerable: list[str] = []
 
         # Calculate next expiry from cache
         for entry in cache.values():

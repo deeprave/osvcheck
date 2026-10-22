@@ -1,14 +1,13 @@
 """Package manager detection and package listing."""
 
+import fnmatch
 import importlib.util
 import json
 import shutil
-import fnmatch
 import subprocess
 import sys
 import tomllib
 from pathlib import Path
-from typing import Dict, List, Optional
 
 
 def _read_pyproject(path: Path) -> dict:
@@ -21,7 +20,7 @@ def _read_pyproject(path: Path) -> dict:
 
 
 def _is_workspace_member(
-    project_root: Path, workspace_root: Path, members: List[str]
+    project_root: Path, workspace_root: Path, members: list[str]
 ) -> bool:
     """Check whether project_root is listed as a workspace member."""
     try:
@@ -44,7 +43,7 @@ def _is_workspace_member(
     return False
 
 
-def find_uv_lock_path(project_root: Path) -> Optional[Path]:
+def find_uv_lock_path(project_root: Path) -> Path | None:
     """Find the uv.lock file for a project, including uv workspace members."""
     local_lock = project_root / "uv.lock"
     if local_lock.exists():
@@ -72,7 +71,7 @@ def find_uv_lock_path(project_root: Path) -> Optional[Path]:
     return None
 
 
-def is_uv_lock_current(project_root: Path, uv_lock: Optional[Path] = None) -> bool:
+def is_uv_lock_current(project_root: Path, uv_lock: Path | None = None) -> bool:
     """Check if uv.lock is up-to-date with its pyproject.toml."""
     if uv_lock is None:
         uv_lock = project_root / "uv.lock"
@@ -95,13 +94,13 @@ def is_uv_lock_current(project_root: Path, uv_lock: Optional[Path] = None) -> bo
             )
             if result.returncode in (0, 1):
                 return result.returncode == 0
-        except (subprocess.SubprocessError, OSError):
+        except (subprocess.SubprocessError, OSError, UnicodeDecodeError):
             pass
 
     return uv_lock.stat().st_mtime >= pyproject.stat().st_mtime
 
 
-def parse_uv_lock(uv_lock_path: Path) -> List[Dict[str, str]]:
+def parse_uv_lock(uv_lock_path: Path) -> list[dict[str, str]]:
     """Parse uv.lock and extract package list."""
     try:
         with open(uv_lock_path, "rb") as f:
@@ -112,7 +111,14 @@ def parse_uv_lock(uv_lock_path: Path) -> List[Dict[str, str]]:
             packages.append({"name": pkg["name"], "version": pkg["version"]})
 
         return packages
-    except Exception:
+    except (
+        OSError,
+        UnicodeDecodeError,
+        tomllib.TOMLDecodeError,
+        AttributeError,
+        KeyError,
+        TypeError,
+    ):
         return []
 
 
@@ -126,7 +132,7 @@ def is_pip_available() -> bool:
     return importlib.util.find_spec("pip") is not None
 
 
-def get_packages_via_uv() -> List[Dict[str, str]]:
+def get_packages_via_uv() -> list[dict[str, str]]:
     """Get packages using uv pip list."""
     try:
         result = subprocess.run(
@@ -136,11 +142,16 @@ def get_packages_via_uv() -> List[Dict[str, str]]:
             check=True,
         )
         return json.loads(result.stdout)
-    except Exception:
+    except (
+        OSError,
+        UnicodeDecodeError,
+        subprocess.SubprocessError,
+        json.JSONDecodeError,
+    ):
         return []
 
 
-def get_packages_via_pip() -> List[Dict[str, str]]:
+def get_packages_via_pip() -> list[dict[str, str]]:
     """Get packages using pip list."""
     try:
         result = subprocess.run(
@@ -150,5 +161,10 @@ def get_packages_via_pip() -> List[Dict[str, str]]:
             check=True,
         )
         return json.loads(result.stdout)
-    except Exception:
+    except (
+        OSError,
+        UnicodeDecodeError,
+        subprocess.SubprocessError,
+        json.JSONDecodeError,
+    ):
         return []

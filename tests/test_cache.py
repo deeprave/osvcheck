@@ -3,6 +3,8 @@
 import time
 
 from osvcheck.cache import (
+    CACHE_MAX_TTL,
+    CACHE_MIN_TTL,
     generate_cache_ttl,
     get_cache_key,
     get_cached_result,
@@ -10,8 +12,6 @@ from osvcheck.cache import (
     load_cache,
     save_cache,
     update_cache,
-    CACHE_MIN_TTL,
-    CACHE_MAX_TTL,
 )
 
 
@@ -39,6 +39,13 @@ def test_load_cache_missing_file(tmp_path):
     cache_file = tmp_path / "missing.json"
     cache = load_cache(cache_file)
     assert cache == {}
+
+
+def test_load_cache_invalid_utf8(tmp_path):
+    cache_file = tmp_path / "cache.json"
+    cache_file.write_bytes(b"\xff")
+
+    assert load_cache(cache_file) == {}
 
 
 def test_load_cache_removes_expired_entries(tmp_path):

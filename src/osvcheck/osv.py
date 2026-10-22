@@ -1,8 +1,9 @@
 """OSV API client for vulnerability checking."""
 
+import http.client
 import json
+import urllib.error
 import urllib.request
-from typing import Dict, List, Tuple
 
 
 class OSVClient:
@@ -35,12 +36,22 @@ class OSVClient:
             with urllib.request.urlopen(req) as response:  # nosec B310
                 result = json.loads(response.read())
                 return bool(result.get("vulns", []))
-        except Exception:
+        except (
+            AttributeError,
+            http.client.HTTPException,
+            IndexError,
+            OSError,
+            TypeError,
+            UnicodeDecodeError,
+            ValueError,
+            json.JSONDecodeError,
+            urllib.error.URLError,
+        ):
             return False
 
     def check_vulnerabilities_batch(
-        self, packages: List[Tuple[str, str]]
-    ) -> Dict[Tuple[str, str], bool]:
+        self, packages: list[tuple[str, str]]
+    ) -> dict[tuple[str, str], bool]:
         """Check multiple packages for vulnerabilities in a single request.
 
         Args:
@@ -70,5 +81,15 @@ class OSVClient:
                     packages[i]: bool(r.get("vulns", []))
                     for i, r in enumerate(result.get("results", []))
                 }
-        except Exception:
+        except (
+            AttributeError,
+            http.client.HTTPException,
+            IndexError,
+            OSError,
+            TypeError,
+            UnicodeDecodeError,
+            ValueError,
+            json.JSONDecodeError,
+            urllib.error.URLError,
+        ):
             return {pkg: False for pkg in packages}
