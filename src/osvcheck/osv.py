@@ -1,5 +1,6 @@
 """OSV API client for vulnerability checking."""
 
+import http.client
 import json
 import urllib.error
 import urllib.request
@@ -37,6 +38,7 @@ class OSVClient:
                 return bool(result.get("vulns", []))
         except (
             AttributeError,
+            http.client.HTTPException,
             IndexError,
             OSError,
             TypeError,
@@ -81,6 +83,7 @@ class OSVClient:
                 }
         except (
             AttributeError,
+            http.client.HTTPException,
             IndexError,
             OSError,
             TypeError,
