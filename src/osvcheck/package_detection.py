@@ -127,8 +127,54 @@ def is_uv_available() -> bool:
     return shutil.which("uv") is not None
 
 
-def is_pip_available() -> bool:
+def find_venv_python(venv_path: Path) -> Path | None:
+    """Return a virtual environment's Python interpreter, if present."""
+    for executable in (
+        venv_path / "bin" / "python",
+        venv_path / "bin" / "python3",
+        venv_path / "Scripts" / "python.exe",
+        venv_path / "Scripts" / "python3.exe",
+    ):
+        if executable.is_file():
+            return executable
+    return None
+
+
+def find_local_virtualenvs(project_root: Path) -> list[Path]:
+    """Find immediate-child virtual environments identified by standard markers."""
+    return [
+        candidate
+        for candidate in sorted(project_root.iterdir())
+        if candidate.is_dir()
+        and (candidate / "pyvenv.cfg").is_file()
+        and ((candidate / "lib").is_dir() or (candidate / "Lib").is_dir())
+    ]
+
+
+def is_uv_managed_virtualenv(venv_path: Path) -> bool:
+    """Return whether a virtual environment was created by uv."""
+    try:
+        return any(
+            line.startswith("uv =")
+            for line in (venv_path / "pyvenv.cfg").read_text().splitlines()
+        )
+    except OSError:
+        return False
+
+
+def is_pip_available(python_executable: Path | None = None) -> bool:
     """Check if pip module is available."""
+    if python_executable is not None:
+        try:
+            result = subprocess.run(
+                [str(python_executable), "-m", "pip", "--version"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            return result.returncode == 0
+        except (OSError, UnicodeDecodeError):
+            return False
     return importlib.util.find_spec("pip") is not None
 
 
@@ -151,11 +197,15 @@ def get_packages_via_uv() -> list[dict[str, str]]:
         return []
 
 
-def get_packages_via_pip() -> list[dict[str, str]]:
+def get_packages_via_pip(
+    python_executable: Path | None = None,
+) -> list[dict[str, str]]:
     """Get packages using pip list."""
+    if python_executable is None:
+        python_executable = Path(sys.executable)
     try:
         result = subprocess.run(
-            [sys.executable, "-m", "pip", "list", "--format", "json"],
+            [str(python_executable), "-m", "pip", "list", "--format", "json"],
             capture_output=True,
             text=True,
             check=True,

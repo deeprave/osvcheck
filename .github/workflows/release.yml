@@ -2,6 +2,12 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      draft:
+        description: Create the GitHub release as a draft
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   test:
@@ -78,5 +84,5 @@ jobs:
         tag_name: v${{ steps.version.outputs.version }}
         name: v${{ steps.version.outputs.version }}
         generate_release_notes: true
-        draft: true
+        draft: ${{ inputs.draft }}
         prerelease: ${{ contains(steps.version.outputs.version, 'a') || contains(steps.version.outputs.version, 'b') || contains(steps.version.outputs.version, 'rc') }}
