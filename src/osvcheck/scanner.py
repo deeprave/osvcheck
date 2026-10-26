@@ -58,9 +58,12 @@ class UvLockPackageLister:
 class UvPackageLister:
     """Package lister using uv pip list."""
 
+    def __init__(self, python_executable: Path | None = None):
+        self.python_executable = python_executable
+
     def list_packages(self) -> list[dict[str, str]]:
         """Get all installed packages using uv."""
-        return get_packages_via_uv()
+        return get_packages_via_uv(self.python_executable)
 
 
 class PipPackageLister:

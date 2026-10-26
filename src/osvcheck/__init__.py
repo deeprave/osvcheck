@@ -48,18 +48,27 @@ def _pip_lister(python_executable: Path) -> PipPackageLister:
     )
 
 
+def _uv_lister(python_executable: Path) -> UvPackageLister:
+    """Return a uv lister for an interpreter, if uv is installed."""
+    if is_uv_available():
+        return UvPackageLister(python_executable)
+    raise RuntimeError(
+        f"uv is required to scan uv-managed virtualenv: {python_executable.parent.parent}"
+    )
+
+
 def _automatic_venv_lister(
     venv_path: Path,
     python_executable: Path,
 ) -> tuple[PackageLister, str | None]:
     """Return a lister for an inferred virtual environment."""
     if is_uv_managed_virtualenv(venv_path):
-        return UvPackageLister(), None
+        return _uv_lister(python_executable), None
     if is_pip_available(python_executable):
         return PipPackageLister(python_executable), None
     if is_uv_available():
         return (
-            UvPackageLister(),
+            UvPackageLister(python_executable),
             (
                 f"pip is not available for {python_executable}; scanning with uv instead.\n"
                 f"Run: {python_executable} -m ensurepip to enable pip scanning."
@@ -93,6 +102,8 @@ def detect_package_lister(
                 f"No Python interpreter found in virtualenv: {venv_path}"
             )
         logger.debug("Selected explicit virtualenv: %s", venv_path)
+        if is_uv_managed_virtualenv(venv_path):
+            return _uv_lister(interpreter), None
         return _pip_lister(interpreter), None
 
     virtual_env = os.environ.get("VIRTUAL_ENV")

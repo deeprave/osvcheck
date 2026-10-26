@@ -37,6 +37,35 @@ def test_is_uv_managed_virtualenv_reads_pyvenv_configuration(tmp_path):
     (venv / "pyvenv.cfg").write_text("home = /usr/bin\nuv = 0.13.5\n")
 
     assert package_detection.is_uv_managed_virtualenv(venv)
+    assert not package_detection.is_uv_managed_virtualenv(
+        create_virtualenv(tmp_path, "ordinary-virtualenv")
+    )
+
+
+def test_get_packages_via_uv_uses_selected_interpreter(monkeypatch, tmp_path):
+    interpreter = tmp_path / "python"
+    interpreter.touch()
+    expected_command = [
+        "uv",
+        "pip",
+        "list",
+        "--format",
+        "json",
+        "--python",
+        str(interpreter),
+    ]
+
+    def fake_run(command, **kwargs):
+        assert command == expected_command
+        return subprocess.CompletedProcess(
+            command, 0, '[{"name": "example", "version": "1"}]'
+        )
+
+    monkeypatch.setattr(package_detection.subprocess, "run", fake_run)
+
+    assert package_detection.get_packages_via_uv(interpreter) == [
+        {"name": "example", "version": "1"}
+    ]
 
 
 def test_get_packages_via_pip_uses_selected_interpreter(monkeypatch, tmp_path):
@@ -110,7 +139,8 @@ def test_package_listing_invalid_utf8(lister, monkeypatch):
 
     monkeypatch.setattr(package_detection.subprocess, "run", fake_run)
 
-    assert lister() == []
+    with pytest.raises(package_detection.PackageListingError):
+        lister()
 
 
 def test_find_uv_lock_path_in_workspace_member(tmp_path):

@@ -88,6 +88,33 @@ def test_detect_package_lister_uses_uv_for_uv_managed_virtual_env(
     lister, warning = osvcheck.detect_package_lister()
 
     assert isinstance(lister, UvPackageLister)
+    assert lister.python_executable == venv / "bin" / "python"
+    assert warning is None
+
+
+def test_detect_package_lister_requires_uv_for_uv_managed_virtual_env(
+    monkeypatch, tmp_path
+):
+    venv = create_uv_virtualenv(tmp_path, "myvirtualenv")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("VIRTUAL_ENV", str(venv))
+    monkeypatch.setattr(osvcheck, "is_uv_available", lambda: False)
+
+    with pytest.raises(RuntimeError, match="uv is required"):
+        osvcheck.detect_package_lister()
+
+
+def test_detect_package_lister_uses_uv_for_explicit_uv_virtualenv(
+    monkeypatch, tmp_path
+):
+    venv = create_uv_virtualenv(tmp_path, "myvirtualenv")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(osvcheck, "is_uv_available", lambda: True)
+
+    lister, warning = osvcheck.detect_package_lister(venv_path=venv)
+
+    assert isinstance(lister, UvPackageLister)
+    assert lister.python_executable == venv / "bin" / "python"
     assert warning is None
 
 

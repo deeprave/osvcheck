@@ -10,6 +10,10 @@ import tomllib
 from pathlib import Path
 
 
+class PackageListingError(RuntimeError):
+    """Raised when a package manager cannot list an environment's packages."""
+
+
 def _read_pyproject(path: Path) -> dict:
     """Read a pyproject.toml file safely."""
     try:
@@ -178,11 +182,16 @@ def is_pip_available(python_executable: Path | None = None) -> bool:
     return importlib.util.find_spec("pip") is not None
 
 
-def get_packages_via_uv() -> list[dict[str, str]]:
+def get_packages_via_uv(
+    python_executable: Path | None = None,
+) -> list[dict[str, str]]:
     """Get packages using uv pip list."""
+    command = ["uv", "pip", "list", "--format", "json"]
+    if python_executable is not None:
+        command.extend(["--python", str(python_executable)])
     try:
         result = subprocess.run(
-            ["uv", "pip", "list", "--format", "json"],
+            command,
             capture_output=True,
             text=True,
             check=True,
@@ -193,8 +202,8 @@ def get_packages_via_uv() -> list[dict[str, str]]:
         UnicodeDecodeError,
         subprocess.SubprocessError,
         json.JSONDecodeError,
-    ):
-        return []
+    ) as error:
+        raise PackageListingError("Unable to list packages with uv") from error
 
 
 def get_packages_via_pip(
@@ -216,5 +225,5 @@ def get_packages_via_pip(
         UnicodeDecodeError,
         subprocess.SubprocessError,
         json.JSONDecodeError,
-    ):
-        return []
+    ) as error:
+        raise PackageListingError("Unable to list packages with pip") from error
