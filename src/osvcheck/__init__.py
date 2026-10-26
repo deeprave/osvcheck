@@ -1,6 +1,7 @@
 """osvcheck - Lightweight vulnerability scanner for Python dependencies."""
 
 import logging
+import os
 import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -17,10 +18,13 @@ from .dependencies import get_direct_dependencies
 from .log import setup_logging
 from .osv import OSVClient
 from .package_detection import (
+    find_local_virtualenvs,
     find_uv_lock_path,
+    find_venv_python,
     is_pip_available,
     is_uv_available,
     is_uv_lock_current,
+    is_uv_managed_virtualenv,
 )
 from .scanner import (
     PackageLister,
@@ -34,7 +38,49 @@ CACHE_FILE = Path(".osvcheck_cache")
 logger = logging.getLogger("osvcheck")
 
 
-def detect_package_lister() -> tuple[PackageLister, str | None]:
+def _pip_lister(python_executable: Path) -> PipPackageLister:
+    """Return a pip lister or explain how to bootstrap pip for its interpreter."""
+    if is_pip_available(python_executable):
+        return PipPackageLister(python_executable)
+    raise RuntimeError(
+        f"pip is not available for {python_executable}.\n"
+        f"Run: {python_executable} -m ensurepip"
+    )
+
+
+def _uv_lister(python_executable: Path) -> UvPackageLister:
+    """Return a uv lister for an interpreter, if uv is installed."""
+    if is_uv_available():
+        return UvPackageLister(python_executable)
+    raise RuntimeError(
+        f"uv is required to scan uv-managed virtualenv: {python_executable.parent.parent}"
+    )
+
+
+def _automatic_venv_lister(
+    venv_path: Path,
+    python_executable: Path,
+) -> tuple[PackageLister, str | None]:
+    """Return a lister for an inferred virtual environment."""
+    if is_uv_managed_virtualenv(venv_path):
+        return _uv_lister(python_executable), None
+    if is_pip_available(python_executable):
+        return PipPackageLister(python_executable), None
+    if is_uv_available():
+        return (
+            UvPackageLister(python_executable),
+            (
+                f"pip is not available for {python_executable}; scanning with uv instead.\n"
+                f"Run: {python_executable} -m ensurepip to enable pip scanning."
+            ),
+        )
+    return _pip_lister(python_executable), None
+
+
+def detect_package_lister(
+    python_executable: Path | None = None,
+    venv_path: Path | None = None,
+) -> tuple[PackageLister, str | None]:
     """Detect and return appropriate package lister.
 
     Returns:
@@ -44,6 +90,47 @@ def detect_package_lister() -> tuple[PackageLister, str | None]:
     pyproject = project_root / "pyproject.toml"
     uv_lock = find_uv_lock_path(project_root)
     warning = None
+
+    if python_executable is not None:
+        logger.debug("Selected explicit Python interpreter: %s", python_executable)
+        return _pip_lister(python_executable), None
+
+    if venv_path is not None:
+        interpreter = find_venv_python(venv_path)
+        if interpreter is None:
+            raise RuntimeError(
+                f"No Python interpreter found in virtualenv: {venv_path}"
+            )
+        logger.debug("Selected explicit virtualenv: %s", venv_path)
+        if is_uv_managed_virtualenv(venv_path):
+            return _uv_lister(interpreter), None
+        return _pip_lister(interpreter), None
+
+    virtual_env = os.environ.get("VIRTUAL_ENV")
+    if virtual_env:
+        interpreter = find_venv_python(Path(virtual_env))
+        if interpreter is None:
+            raise RuntimeError(
+                f"No Python interpreter found in VIRTUAL_ENV: {virtual_env}"
+            )
+        logger.debug("Selected VIRTUAL_ENV interpreter: %s", interpreter)
+        return _automatic_venv_lister(Path(virtual_env), interpreter)
+
+    virtualenvs = find_local_virtualenvs(project_root)
+    if len(virtualenvs) == 1:
+        interpreter = find_venv_python(virtualenvs[0])
+        if interpreter is None:
+            raise RuntimeError(
+                f"No Python interpreter found in local virtualenv: {virtualenvs[0]}"
+            )
+        logger.debug("Selected local virtualenv interpreter: %s", interpreter)
+        return _automatic_venv_lister(virtualenvs[0], interpreter)
+    if len(virtualenvs) > 1:
+        choices = ", ".join(str(path) for path in virtualenvs)
+        raise RuntimeError(
+            f"Multiple local virtual environments found: {choices}.\n"
+            "Use --venv or --python to select one."
+        )
 
     logger.debug("Detecting package manager...")
     logger.debug("  pyproject.toml exists: %s", pyproject.exists())
@@ -150,7 +237,10 @@ def main() -> None:
     logger.debug("Starting osvcheck")
 
     # Detect package manager
-    package_lister, warning = detect_package_lister()
+    package_lister, warning = detect_package_lister(
+        python_executable=args.python,
+        venv_path=args.venv,
+    )
 
     if warning:
         logger.warning(warning)

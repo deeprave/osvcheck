@@ -71,6 +71,16 @@ def parse_args() -> argparse.Namespace:
         metavar="PKG[,PKG...]",
         help="Ignore vulnerability for package(s); comma-separated, repeatable",
     )
+    parser.add_argument(
+        "--python",
+        type=Path,
+        help="Python interpreter to scan; takes precedence over --venv",
+    )
+    parser.add_argument(
+        "--venv",
+        type=Path,
+        help="Virtual environment directory to scan",
+    )
 
     return parser.parse_args()
 

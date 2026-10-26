@@ -28,6 +28,10 @@ Install via pip or uv, or add to your project's dev dependencies.
 # Scan current project
 osvcheck
 
+# Scan a specific interpreter or virtual environment
+osvcheck --python /path/to/python
+osvcheck --venv /path/to/virtualenv
+
 # Logging options
 osvcheck -v              # Verbose (debug) output
 osvcheck -q              # Quiet (warnings/errors only)
@@ -90,6 +94,7 @@ certifi = { permanent = true, reason = "httpx uses the system keychain." }
   - Uses `uv.lock` if present and up-to-date (fastest)
   - Falls back to `uv pip list` if uv is available
   - Falls back to `pip list` if pip is available
+  - Prefers an active or single marker-identified local virtualenv
 - Smart caching with 12-48 hour randomized TTL
 - Distinguishes between direct and indirect dependency vulnerabilities
 - Zero runtime dependencies (Python stdlib only)
